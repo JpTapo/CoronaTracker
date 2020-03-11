@@ -38,6 +38,12 @@ class JHURepoDataService: DataService {
 		downloadDailyReport(date: today, completion: completion)
 	}
 
+    func fetchReportsItaly(completion: @escaping FetchReportsItalyBlock) {
+        print("🦥: ", #function)
+        let today = Date()
+        downloadDailyReportItaly(date: today, completion: completion)
+    }
+    
 	private func downloadDailyReport(date: Date, completion: @escaping FetchReportsBlock) {
 		if date.ageDays > Self.maxOldDataAge {
 			completion(nil, FetchError.tooOldData)
@@ -79,6 +85,50 @@ class JHURepoDataService: DataService {
 		}.resume()
 	}
 
+    private func downloadDailyReportItaly(date: Date, completion: @escaping FetchReportsItalyBlock) {
+        if date.ageDays > Self.maxOldDataAge {
+            completion(nil, FetchError.tooOldData)
+            return
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = .posix
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let fileName = formatter.string(from: date)
+
+        // TODO: set here the dailyReportsItalyURLString
+        print("Downloading \(fileName) 🦥: ", #function)
+        let url = URL(string: String(format: Self.dailyReportURLString, fileName), relativeTo: Self.baseURL)!
+
+        _ = URLSession.shared.dataTask(with: url) { (data, response, error) in
+
+            guard let response = response as? HTTPURLResponse,
+                response.statusCode == 200,
+                let data = data else {
+
+                    print("Failed downloading \(fileName) 🦥: ", #function)
+                    self.downloadDailyReportItaly(date: date.yesterday, completion: completion)
+                    return
+            }
+
+            DispatchQueue.global(qos: .default).async {
+                // TODO: set here the dailyReportItalyFileName
+                let oldData = try? Disk.retrieve(Self.dailyReportFileName, from: .caches, as: Data.self)
+                if (oldData == data) {
+                    print("Nothing new 🦥: ", #function)
+                    completion(nil, FetchError.noNewData)
+                    return
+                }
+
+                print("Download success \(fileName) 🦥: ", #function)
+                // TODO: set here the dailyReportItalyFileName
+                try? Disk.save(data, to: .caches, as: Self.dailyReportFileName)
+
+                self.parseReportsItaly(data: data, completion: completion)
+            }
+        }.resume()
+    }
+    
 	private func parseReports(data: Data, completion: @escaping FetchReportsBlock) {
 		do {
 			let reader = try CSVReader(string: String(data: data, encoding: .utf8)!, hasHeaderRow: true)
@@ -86,10 +136,27 @@ class JHURepoDataService: DataService {
 			completion(reports, nil)
 		}
 		catch {
-			print("Unexpected error: \(error).")
+			print("Unexpected error: \(error). 🦥: ", #function)
 			completion(nil, error)
 		}
 	}
+    
+    private func parseReportsItaly(data: Data, completion: @escaping FetchReportsItalyBlock) {
+        do {
+            let reader = try CSVReader(string: String(data: data, encoding: .utf8)!, hasHeaderRow: true)
+            let reports: [Report] = []
+            for row in reader {
+                // TODO: create Report here with CSV table
+                
+                // TODO: add the Report to reports
+            }
+            completion(reports, nil)
+        }
+        catch {
+            print("Unexpected error: \(error). 🦥: ", #function)
+            completion(nil, error)
+        }
+    }
 
 	func fetchTimeSerieses(completion: @escaping FetchTimeSeriesesBlock) {
 		let dispatchGroup = DispatchGroup()

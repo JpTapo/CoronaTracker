@@ -18,21 +18,24 @@ class JHUWebDataService: DataService {
 	}
 
 	private static let reportsFileName = "JHUWebDataService-Reports.json"
+    private static let reportsItalyFileName = "JHUWebDataService-Reports-Italy.json"
 	private static let globalTimeSeriesFileName = "JHUWebDataService-GlobalTimeSeries.json"
 
 	private static let reportsURL = URL(string: "https://services1.arcgis.com/0MSEUqKaxRlEPj5g/arcgis/rest/services/ncov_cases/FeatureServer/1/query?f=json&where=Confirmed%20%3E%200&returnGeometry=false&spatialRel=esriSpatialRelIntersects&outFields=*&orderByFields=Confirmed%20desc%2CCountry_Region%20asc%2CProvince_State%20asc&resultOffset=0&resultRecordCount=500&cacheHint=true")!
 	private static let globalTimeSeriesURL = URL(string: "https://services1.arcgis.com/0MSEUqKaxRlEPj5g/arcgis/rest/services/cases_time_v3/FeatureServer/0/query?f=json&where=1%3D1&returnGeometry=false&spatialRel=esriSpatialRelIntersects&outFields=*&orderByFields=Report_Date_String%20asc&outSR=102100&resultOffset=0&resultRecordCount=2000&cacheHint=true")!
+    
+    private static let reportsItalyURL = URL(string:"https://covid19-it-api.herokuapp.com/regioni?data=2020-03-08%2018%3A00%3A00")!
 
 	static let instance = JHUWebDataService()
 
 	func fetchReports(completion: @escaping FetchReportsBlock) {
-		print("Calling API")
+        print("Calling API 🦥: ", #function)
 		_ = URLSession.shared.dataTask(with: Self.reportsURL) { (data, response, error) in
 			guard let response = response as? HTTPURLResponse,
 				response.statusCode == 200,
 				let data = data else {
 
-					print("Failed API call")
+					print("Failed API call 🦥: ", #function)
 					completion(nil, FetchError.downloadError)
 					return
 			}
@@ -40,18 +43,45 @@ class JHUWebDataService: DataService {
 			DispatchQueue.global(qos: .default).async {
 				let oldData = try? Disk.retrieve(Self.reportsFileName, from: .caches, as: Data.self)
 				if (oldData == data) {
-					print("Nothing new")
+					print("Nothing new 🦥: ", #function)
 					completion(nil, FetchError.noNewData)
 					return
 				}
 
-				print("Download success")
+				print("Download success 🦥: ", #function)
 				try? Disk.save(data, to: .caches, as: Self.reportsFileName)
 
 				self.parseReports(data: data, completion: completion)
 			}
 		}.resume()
 	}
+    
+    func fetchReportsItaly(completion: @escaping FetchReportsItalyBlock) {
+        print("Calling API 🦥: ", #function)
+        _ = URLSession.shared.dataTask(with: Self.reportsItalyURL) { (data, response, error) in
+            guard let response = response as? HTTPURLResponse,
+                response.statusCode == 200,
+                let data = data else {
+                    print("Failed API call 🦥: ", #function)
+                    completion(nil, FetchError.downloadError)
+                    return
+            }
+
+            DispatchQueue.global(qos: .default).async {
+                let oldData = try? Disk.retrieve(Self.reportsItalyFileName, from: .caches, as: Data.self)
+                if (oldData == data) {
+                    print("Nothing new 🦥: ", #function)
+                    completion(nil, FetchError.noNewData)
+                    return
+                }
+
+                print("Download success 🦥: ", #function)
+                try? Disk.save(data, to: .caches, as: Self.reportsItalyFileName)
+
+                self.parseReportsItaly(data: data, completion: completion)
+            }
+        }.resume()
+    }
 
 	private func parseReports(data: Data, completion: @escaping FetchReportsBlock) {
 		do {
@@ -61,19 +91,58 @@ class JHUWebDataService: DataService {
 			completion(reports, nil)
 		}
 		catch {
-			print("Unexpected error: \(error).")
+			print("Unexpected error: \(error). 🦥: ", #function)
 			completion(nil, error)
 		}
 	}
+    
+    private func parseReportsItaly(data: Data, completion: @escaping FetchReportsItalyBlock) {
+        do {
+            let decoder = JSONDecoder()
+            let result = try decoder.decode(ReportsItalyCallResult.self, from: data)
+            var reports: [Report] = []
+            for feature in result.features {
+                // Set location
+                let location = Coordinate(
+                    latitude: feature.geometry.coordinates[1],
+                    longitude: feature.geometry.coordinates[0])
+                
+                // Set region
+                let region = Region(
+                    countryName: "Italy",
+                    provinceName: feature.properties.regione,
+                    location: location)
+                
+                // Set date
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                let lastUpdate = dateFormatter.date(from: feature.properties.data)!
+
+                // Set stats
+                let stat = Statistic(
+                    confirmedCount: feature.properties.numero_casi,
+                    recoveredCount: feature.properties.guariti,
+                    deathCount: feature.properties.deceduti)
+
+                // Append the new report
+                reports.append(Report(region: region, lastUpdate: lastUpdate, stat: stat))
+            }
+            completion(reports, nil)
+        }
+        catch {
+            print("Unexpected error: \(error). 🦥: ", #function)
+            completion(nil, error)
+        }
+    }
 
 	func fetchTimeSerieses(completion: @escaping FetchTimeSeriesesBlock) {
-		print("Calling API")
+		print("Calling API 🦥: ", #function)
 		_ = URLSession.shared.dataTask(with: Self.globalTimeSeriesURL) { (data, response, error) in
 			guard let response = response as? HTTPURLResponse,
 				response.statusCode == 200,
 				let data = data else {
 
-					print("Failed API call")
+					print("Failed API call 🦥: ", #function)
 					completion(nil, FetchError.downloadError)
 					return
 			}
@@ -81,12 +150,12 @@ class JHUWebDataService: DataService {
 			DispatchQueue.global(qos: .default).async {
 				let oldData = try? Disk.retrieve(Self.globalTimeSeriesFileName, from: .caches, as: Data.self)
 				if (oldData == data) {
-					print("Nothing new")
+					print("Nothing new 🦥: ", #function)
 					completion(nil, FetchError.noNewData)
 					return
 				}
 
-				print("Download success")
+				print("Download success 🦥: ", #function)
 				try? Disk.save(data, to: .caches, as: Self.globalTimeSeriesFileName)
 
 				self.parseTimeSerieses(data: data, completion: completion)
@@ -102,11 +171,41 @@ class JHUWebDataService: DataService {
 			completion([timeSeries], nil)
 		}
 		catch {
-			print("Unexpected error: \(error).")
+			print("Unexpected error: \(error). 🦥: ", #function)
 			completion(nil, error)
 		}
 	}
 }
+
+/// MARK: structs used for Italy APIs
+
+private struct ReportsItalyCallResult: Decodable {
+    let features: [ReportItalyFeature]
+}
+
+private struct ReportItalyFeature: Decodable {
+    let properties: ReportItalyProperties
+    let geometry: ReportItalyGeometry
+}
+
+private struct ReportItalyProperties: Decodable {
+    let data: String
+    let deceduti: Int
+    let guariti: Int
+    let isolamento_domiciliare: Int
+    let numero_casi: Int
+    let regione: String
+    let ricoverati_con_sintomi: Int
+    let tamponi: Int
+    let terapia_intensiva: Int
+    let totale_positivi: Int
+}
+
+private struct ReportItalyGeometry: Decodable {
+    let coordinates: [Double]
+}
+
+/// MARK:
 
 private struct ReportsCallResult: Decodable {
 	let features: [ReportFeature]
