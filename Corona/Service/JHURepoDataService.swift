@@ -32,6 +32,10 @@ class JHURepoDataService: DataService {
 	private static let confirmedTimeSeriesURL = URL(string: "csse_covid_19_time_series/time_series_19-covid-Confirmed.csv", relativeTo: baseURL)!
 	private static let recoveredTimeSeriesURL = URL(string: "csse_covid_19_time_series/time_series_19-covid-Recovered.csv", relativeTo: baseURL)!
 	private static let deathsTimeSeriesURL = URL(string: "csse_covid_19_time_series/time_series_19-covid-Deaths.csv", relativeTo: baseURL)!
+    
+    private static let baseItalyURL = URL(string: "https://github.com/pcm-dpc/COVID-19/blob/master/dati-regioni/")!
+    private static let dailyReportItalyURLString = "dpc-covid19-ita-regioni-%@.csv"
+    private static let dailyReportItalyFileName = "JHURepoDataService-DailyItalyReport.csv"
 
 	func fetchReports(completion: @escaping FetchReportsBlock) {
 		let today = Date()
@@ -70,12 +74,12 @@ class JHURepoDataService: DataService {
 			}
 
 			DispatchQueue.global(qos: .default).async {
-				let oldData = try? Disk.retrieve(Self.dailyReportFileName, from: .caches, as: Data.self)
-				if (oldData == data) {
-					print("Nothing new")
-					completion(nil, FetchError.noNewData)
-					return
-				}
+//				let oldData = try? Disk.retrieve(Self.dailyReportFileName, from: .caches, as: Data.self)
+//				if (oldData == data) {
+//					print("Nothing new")
+//					completion(nil, FetchError.noNewData)
+//					return
+//				}
 
 				print("Download success \(fileName)")
 				try? Disk.save(data, to: .caches, as: Self.dailyReportFileName)
@@ -96,34 +100,29 @@ class JHURepoDataService: DataService {
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         let fileName = formatter.string(from: date)
 
-        // TODO: set here the dailyReportsItalyURLString
         print("Downloading \(fileName) 🦥: ", #function)
-        let url = URL(string: String(format: Self.dailyReportURLString, fileName), relativeTo: Self.baseURL)!
+        let url = URL(string: String(format: Self.dailyReportItalyURLString, fileName), relativeTo: Self.baseItalyURL)!
 
         _ = URLSession.shared.dataTask(with: url) { (data, response, error) in
 
             guard let response = response as? HTTPURLResponse,
                 response.statusCode == 200,
                 let data = data else {
-
                     print("Failed downloading \(fileName) 🦥: ", #function)
                     self.downloadDailyReportItaly(date: date.yesterday, completion: completion)
                     return
             }
 
             DispatchQueue.global(qos: .default).async {
-                // TODO: set here the dailyReportItalyFileName
-                let oldData = try? Disk.retrieve(Self.dailyReportFileName, from: .caches, as: Data.self)
-                if (oldData == data) {
-                    print("Nothing new 🦥: ", #function)
-                    completion(nil, FetchError.noNewData)
-                    return
-                }
+//                let oldData = try? Disk.retrieve(Self.dailyReportItalyFileName, from: .caches, as: Data.self)
+//                if (oldData == data) {
+//                    print("Nothing new 🦥: ", #function)
+//                    completion(nil, FetchError.noNewData)
+//                    return
+//                }
 
                 print("Download success \(fileName) 🦥: ", #function)
-                // TODO: set here the dailyReportItalyFileName
-                try? Disk.save(data, to: .caches, as: Self.dailyReportFileName)
-
+                try? Disk.save(data, to: .caches, as: Self.dailyReportItalyFileName)
                 self.parseReportsItaly(data: data, completion: completion)
             }
         }.resume()
@@ -146,9 +145,32 @@ class JHURepoDataService: DataService {
             let reader = try CSVReader(string: String(data: data, encoding: .utf8)!, hasHeaderRow: true)
             let reports: [Report] = []
             for row in reader {
-                // TODO: create Report here with CSV table
-                
-                // TODO: add the Report to reports
+                print(reader)
+                // TODO: map data here
+//                // Set location
+//                let location = Coordinate(
+//                    latitude: reader.lat,
+//                    longitude: reader.long)
+//
+//                // Set region
+//                let region = Region(
+//                    countryName: "Italy",
+//                    provinceName: reader.properties.regione,
+//                    location: location)
+//
+//                // Set date
+//                let dateFormatter = DateFormatter()
+//                dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+//                let lastUpdate = dateFormatter.date(from: reader.properties.data)!
+//
+//                // Set stats
+//                let stat = Statistic(
+//                    confirmedCount: reader.properties.totale_casi,
+//                    recoveredCount: reader.properties.dimessi_guariti,
+//                    deathCount: reader.properties.deceduti)
+//
+//                // Append the new report
+//                reports.append(Report(region: region, lastUpdate: lastUpdate, stat: stat))
             }
             completion(reports, nil)
         }

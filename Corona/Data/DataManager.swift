@@ -150,12 +150,9 @@ class DataManager {
 extension DataManager {
 	func download(completion: @escaping (Bool) -> ()) {
 		JHUWebDataService.instance.fetchReports { (reports, error) in
-			guard let reports = reports else {
-				completion(false)
-				return
-			}
-
-			self.allReports = reports
+            if let reports = reports {
+                self.allReports = reports
+            }
 
             JHUWebDataService.instance.fetchReportsItaly { (reports, error) in
                 guard let reports = reports else {

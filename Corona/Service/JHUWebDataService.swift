@@ -24,7 +24,7 @@ class JHUWebDataService: DataService {
 	private static let reportsURL = URL(string: "https://services1.arcgis.com/0MSEUqKaxRlEPj5g/arcgis/rest/services/ncov_cases/FeatureServer/1/query?f=json&where=Confirmed%20%3E%200&returnGeometry=false&spatialRel=esriSpatialRelIntersects&outFields=*&orderByFields=Confirmed%20desc%2CCountry_Region%20asc%2CProvince_State%20asc&resultOffset=0&resultRecordCount=500&cacheHint=true")!
 	private static let globalTimeSeriesURL = URL(string: "https://services1.arcgis.com/0MSEUqKaxRlEPj5g/arcgis/rest/services/cases_time_v3/FeatureServer/0/query?f=json&where=1%3D1&returnGeometry=false&spatialRel=esriSpatialRelIntersects&outFields=*&orderByFields=Report_Date_String%20asc&outSR=102100&resultOffset=0&resultRecordCount=2000&cacheHint=true")!
     
-    private static let reportsItalyURL = URL(string:"https://covid19-it-api.herokuapp.com/regioni?data=2020-03-08%2018%3A00%3A00")!
+    private static let reportsItalyURL = "https://covid19-it-api.herokuapp.com/regioni?data=%@"
 
 	static let instance = JHUWebDataService()
 
@@ -58,7 +58,25 @@ class JHUWebDataService: DataService {
     
     func fetchReportsItaly(completion: @escaping FetchReportsItalyBlock) {
         print("Calling API 🦥: ", #function)
-        _ = URLSession.shared.dataTask(with: Self.reportsItalyURL) { (data, response, error) in
+                
+        let formatter = DateFormatter()
+        
+        let today = Date()
+        let calendar = Calendar.current
+        let midnight = calendar.startOfDay(for: today)
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: midnight)!
+        
+        formatter.locale = .posix
+        formatter.dateFormat = "yyyy-MM-dd"
+        let todayDate = formatter.string(from: yesterday)
+        
+        print("🐴 - reportsItalyURL: ", Self.reportsItalyURL)
+        print("🐴 - todayDate: ", todayDate)
+        print("🐴 - String(format: Self.reportsItalyURL, todayDate): ", String(format: Self.reportsItalyURL, todayDate))
+        
+        let url = URL(string: String(format: Self.reportsItalyURL, todayDate))!
+        
+        _ = URLSession.shared.dataTask(with: url) { (data, response, error) in
             guard let response = response as? HTTPURLResponse,
                 response.statusCode == 200,
                 let data = data else {
@@ -68,12 +86,14 @@ class JHUWebDataService: DataService {
             }
 
             DispatchQueue.global(qos: .default).async {
-                let oldData = try? Disk.retrieve(Self.reportsItalyFileName, from: .caches, as: Data.self)
-                if (oldData == data) {
-                    print("Nothing new 🦥: ", #function)
-                    completion(nil, FetchError.noNewData)
-                    return
-                }
+//                let oldData = try? Disk.retrieve(Self.reportsItalyFileName, from: .caches, as: Data.self)
+//                print("🐴 oldData = ", oldData?.description)
+//                print("🐴 data = ", data.description)
+//                if (oldData == data) {
+//                    print("Nothing new 🦥: ", #function)
+//                    completion(nil, FetchError.noNewData)
+//                    return
+//                }
 
                 print("Download success 🦥: ", #function)
                 try? Disk.save(data, to: .caches, as: Self.reportsItalyFileName)
@@ -110,7 +130,7 @@ class JHUWebDataService: DataService {
                 // Set region
                 let region = Region(
                     countryName: "Italy",
-                    provinceName: feature.properties.regione,
+                    provinceName: feature.properties.denominazione_regione,
                     location: location)
                 
                 // Set date
@@ -120,8 +140,8 @@ class JHUWebDataService: DataService {
 
                 // Set stats
                 let stat = Statistic(
-                    confirmedCount: feature.properties.numero_casi,
-                    recoveredCount: feature.properties.guariti,
+                    confirmedCount: feature.properties.totale_casi,
+                    recoveredCount: feature.properties.dimessi_guariti,
                     deathCount: feature.properties.deceduti)
 
                 // Append the new report
@@ -191,14 +211,16 @@ private struct ReportItalyFeature: Decodable {
 private struct ReportItalyProperties: Decodable {
     let data: String
     let deceduti: Int
-    let guariti: Int
+    let dimessi_guariti: Int
     let isolamento_domiciliare: Int
-    let numero_casi: Int
-    let regione: String
+    let codice_regione: Int
+    let denominazione_regione: String
     let ricoverati_con_sintomi: Int
     let tamponi: Int
     let terapia_intensiva: Int
-    let totale_positivi: Int
+    let totale_attualmente_positivi: Int
+    let totale_casi: Int
+    let totale_ospitalizzati: Int
 }
 
 private struct ReportItalyGeometry: Decodable {
